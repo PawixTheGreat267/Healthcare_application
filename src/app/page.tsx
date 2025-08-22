@@ -1,112 +1,148 @@
-import Image from "next/image";
+"use client";
 
-// export default function Home() {
-//   return (
-//     <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-//       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-//         <Image
-//           className="dark:invert"
-//           src="/next.svg"
-//           alt="Next.js logo"
-//           width={180}
-//           height={38}
-//           priority
-//         />
-//         <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-//           <li className="mb-2 tracking-[-.01em]">
-//             Get started by editing{" "}
-//             <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-//               src/app/page.tsx
-//             </code>
-//             .
-//           </li>
-//           <li className="tracking-[-.01em]">
-//             Save and see your changes instantly.
-//           </li>
-//         </ol>
+import { useState } from "react";
+import { useSpeechRecognition } from "react-speech-kit";
 
-//         <div className="flex gap-4 items-center flex-col sm:flex-row">
-//           <a
-//             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-//             href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//             target="_blank"
-//             rel="noopener noreferrer"
-//           >
-//             <Image
-//               className="dark:invert"
-//               src="/vercel.svg"
-//               alt="Vercel logomark"
-//               width={20}
-//               height={20}
-//             />
-//             Deploy now
-//           </a>
-//           <a
-//             className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-//             href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//             target="_blank"
-//             rel="noopener noreferrer"
-//           >
-//             Read our docs
-//           </a>
-//         </div>
-//       </main>
-//       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-//         <a
-//           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-//           href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           <Image
-//             aria-hidden
-//             src="/file.svg"
-//             alt="File icon"
-//             width={16}
-//             height={16}
-//           />
-//           Learn
-//         </a>
-//         <a
-//           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-//           href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           <Image
-//             aria-hidden
-//             src="/window.svg"
-//             alt="Window icon"
-//             width={16}
-//             height={16}
-//           />
-//           Examples
-//         </a>
-//         <a
-//           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-//           href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           <Image
-//             aria-hidden
-//             src="/globe.svg"
-//             alt="Globe icon"
-//             width={16}
-//             height={16}
-//           />
-//           Go to nextjs.org →
-//         </a>
-//       </footer>
-//     </div>
-//   );
-// }
-
+const languages = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "zh", label: "Chinese" },
+  { code: "tl", label: "Tagalog" },
+];
 
 export default function Home() {
+  const [inputLang, setInputLang] = useState("en");
+  const [outputLang, setOutputLang] = useState("es");
+  const [transcript, setTranscript] = useState("");
+  const [translated, setTranslated] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+
+  const { listen, stop } = useSpeechRecognition({
+    onResult: (result) => setTranscript(result),
+    lang: inputLang,
+  });
+
+  const handleStart = () => {
+    setIsRecording(true);
+    listen();
+  };
+
+  const handleStop = () => {
+    setIsRecording(false);
+    stop();
+  };
+
+  const handleTranslate = async () => {
+    if (!transcript) return;
+    setIsTranslating(true);
+
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: transcript,
+          targetLang: outputLang,
+        }),
+      });
+
+      const data = await res.json();
+      setTranslated(data.translation);
+    } catch (err) {
+      console.error("Translation error:", err);
+      setTranslated("Error translating text.");
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const handleSpeak = () => {
+    if (!translated) return;
+    const utterance = new SpeechSynthesisUtterance(translated);
+    utterance.lang = outputLang;
+    speechSynthesis.speak(utterance);
+  };
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-100">
-      <h1 className="text-4xl font-bold text-blue-600">Hello, Healthcare Translator! 🩺</h1>
+    <main className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-100 gap-6">
+      <h1 className="text-3xl font-bold text-blue-600">
+        Healthcare Translator 🩺
+      </h1>
+
+      <div className="flex gap-4">
+        <div>
+          <label>Input Language:</label>
+          <select
+            value={inputLang}
+            onChange={(e) => setInputLang(e.target.value)}
+            className="ml-2 p-1 border rounded"
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label>Output Language:</label>
+          <select
+            value={outputLang}
+            onChange={(e) => setOutputLang(e.target.value)}
+            className="ml-2 p-1 border rounded"
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex gap-4">
+        {!isRecording ? (
+          <button
+            onClick={handleStart}
+            className="px-4 py-2 bg-green-500 text-white rounded"
+          >
+            Start Recording
+          </button>
+        ) : (
+          <button
+            onClick={handleStop}
+            className="px-4 py-2 bg-red-500 text-white rounded"
+          >
+            Stop Recording
+          </button>
+        )}
+
+        <button
+          onClick={handleTranslate}
+          className="px-4 py-2 bg-blue-500 text-white rounded"
+        >
+          {isTranslating ? "Translating..." : "Translate"}
+        </button>
+
+        <button
+          onClick={handleSpeak}
+          className="px-4 py-2 bg-purple-500 text-white rounded"
+        >
+          Speak
+        </button>
+      </div>
+
+      <div className="w-full max-w-md">
+        <h2 className="font-semibold">Original Transcript:</h2>
+        <p className="p-2 bg-white border rounded min-h-[50px]">{transcript}</p>
+
+        <h2 className="font-semibold mt-4">Translated Text:</h2>
+        <p className="p-2 bg-white border rounded min-h-[50px]">{translated}</p>
+      </div>
     </main>
   );
 }
