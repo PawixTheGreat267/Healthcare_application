@@ -40,7 +40,7 @@ export default function Home() {
     setIsTranslating(true);
 
     try {
-      const res = await fetch("/src/api/pages/translate.ts", {
+      const res = await fetch("/src/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
