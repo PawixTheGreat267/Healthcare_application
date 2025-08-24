@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useSpeechRecognition } from "react-speech-kit";
+import { useState, useRef } from "react";
 
 const languages = [
   { code: "en", label: "English" },
@@ -19,20 +18,43 @@ export default function Home() {
   const [translated, setTranslated] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-
-  const { listen, stop } = useSpeechRecognition({
-    onResult: (result) => setTranscript(result),
-    lang: inputLang,
-  });
+  
+  const recognitionRef = useRef<any>(null);
 
   const handleStart = () => {
-    setIsRecording(true);
-    listen();
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.lang = inputLang;
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      
+      recognitionRef.current.onresult = (event: any) => {
+        const result = event.results[0][0].transcript;
+        setTranscript(result);
+      };
+      
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsRecording(false);
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+      
+      recognitionRef.current.start();
+      setIsRecording(true);
+    } else {
+      alert('Speech recognition not supported in this browser');
+    }
   };
 
   const handleStop = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     setIsRecording(false);
-    stop();
   };
 
   const handleTranslate = async () => {
@@ -67,82 +89,114 @@ export default function Home() {
   };
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-100 gap-6">
-      <h1 className="text-3xl font-bold text-blue-600">
-        Healthcare Translator 🩺
-      </h1>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-bold text-center text-gray-800 mb-8">
+          Healthcare Translator
+        </h1>
+        
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Input Language Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Input Language
+              </label>
+              <select
+                value={inputLang}
+                onChange={(e) => setInputLang(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {languages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      <div className="flex gap-4">
-        <div>
-          <label>Input Language:</label>
-          <select
-            value={inputLang}
-            onChange={(e) => setInputLang(e.target.value)}
-            className="ml-2 p-1 border rounded"
-          >
-            {languages.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
+            {/* Output Language Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Output Language
+              </label>
+              <select
+                value={outputLang}
+                onChange={(e) => setOutputLang(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {languages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label>Output Language:</label>
-          <select
-            value={outputLang}
-            onChange={(e) => setOutputLang(e.target.value)}
-            className="ml-2 p-1 border rounded"
-          >
-            {languages.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
+        {/* Recording Section */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            Speech Input
+          </h2>
+          
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={handleStart}
+              disabled={isRecording}
+              className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              {isRecording ? "Recording..." : "Start Recording"}
+            </button>
+            
+            <button
+              onClick={handleStop}
+              disabled={!isRecording}
+              className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              Stop Recording
+            </button>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg min-h-[100px]">
+            <h3 className="font-medium text-gray-700 mb-2">Transcript:</h3>
+            <p className="text-gray-600">
+              {transcript || "Click 'Start Recording' and speak..."}
+            </p>
+          </div>
+        </div>
+
+        {/* Translation Section */}
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Translation</h2>
+            <button
+              onClick={handleTranslate}
+              disabled={!transcript || isTranslating}
+              className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              {isTranslating ? "Translating..." : "Translate"}
+            </button>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-lg min-h-[100px]">
+            <h3 className="font-medium text-gray-700 mb-2">Translation:</h3>
+            <p className="text-gray-600">
+              {translated || "Translation will appear here..."}
+            </p>
+          </div>
+
+          {translated && (
+            <button
+              onClick={handleSpeak}
+              className="mt-4 bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              🔊 Speak Translation
+            </button>
+          )}
         </div>
       </div>
-
-      <div className="flex gap-4">
-        {!isRecording ? (
-          <button
-            onClick={handleStart}
-            className="px-4 py-2 bg-green-500 text-white rounded"
-          >
-            Start Recording
-          </button>
-        ) : (
-          <button
-            onClick={handleStop}
-            className="px-4 py-2 bg-red-500 text-white rounded"
-          >
-            Stop Recording
-          </button>
-        )}
-
-        <button
-          onClick={handleTranslate}
-          className="px-4 py-2 bg-blue-500 text-white rounded"
-        >
-          {isTranslating ? "Translating..." : "Translate"}
-        </button>
-
-        <button
-          onClick={handleSpeak}
-          className="px-4 py-2 bg-purple-500 text-white rounded"
-        >
-          Speak
-        </button>
-      </div>
-
-      <div className="w-full max-w-md">
-        <h2 className="font-semibold">Original Transcript:</h2>
-        <p className="p-2 bg-white border rounded min-h-[50px]">{transcript}</p>
-
-        <h2 className="font-semibold mt-4">Translated Text:</h2>
-        <p className="p-2 bg-white border rounded min-h-[50px]">{translated}</p>
-      </div>
-    </main>
+    </div>
   );
 }
