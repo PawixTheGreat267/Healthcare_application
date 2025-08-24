@@ -1,17 +1,14 @@
-import type { NextApiRequest, NextApiResponse } from "next";
+import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  const { text, targetLang } = req.body;
-
+export async function POST(request: NextRequest) {
   try {
+    const { text, targetLang } = await request.json();
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -23,9 +20,9 @@ export default async function handler(
     });
 
     const translation = completion.choices[0].message?.content ?? "";
-    res.status(200).json({ translation });
+    return NextResponse.json({ translation });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ translation: "" });
+    return NextResponse.json({ translation: "" }, { status: 500 });
   }
 }
